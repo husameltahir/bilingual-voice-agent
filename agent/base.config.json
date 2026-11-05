@@ -1,0 +1,117 @@
+{
+  "name": "{{agent_name}}",
+  "conversation_config": {
+    "agent": {
+      "language": "{{default_language}}",
+      "first_message": "{{first_message}}",
+      "prompt": {
+        "prompt": "{{prompt}}",
+        "llm": "claude-haiku-4-5",
+        "temperature": 0.2,
+        "tool_ids": "{{tool_ids}}",
+        "built_in_tools": {
+          "end_call": {
+            "type": "system",
+            "name": "end_call",
+            "description": "End the call when the caller says goodbye or has no more questions.",
+            "params": { "system_tool_type": "end_call" }
+          },
+          "language_detection": {
+            "type": "system",
+            "name": "language_detection",
+            "description": "Switch to the caller's language when they speak one of the supported languages.",
+            "params": { "system_tool_type": "language_detection" }
+          }
+        },
+        "knowledge_base": "{{knowledge_base}}",
+        "rag": { "enabled": true }
+      }
+    },
+    "tts": {
+      "model_id": "eleven_flash_v2_5",
+      "voice_id": "{{voice_id}}"
+    },
+    "asr": {
+      "provider": "scribe_realtime"
+    },
+    "conversation": {
+      "max_duration_seconds": "{{max_duration_seconds}}"
+    },
+    "language_presets": "{{language_presets}}"
+  },
+  "platform_settings": {
+    "auth": {
+      "enable_auth": true
+    },
+    "call_limits": {
+      "agent_concurrency_limit": "{{concurrency_limit}}",
+      "daily_limit": "{{daily_limit}}",
+      "bursting_enabled": false
+    },
+    "overrides": {
+      "conversation_config_override": {
+        "agent": {
+          "language": true,
+          "first_message": true
+        }
+      }
+    },
+    "privacy": {
+      "record_voice": "{{record_voice}}",
+      "retention_days": "{{retention_days}}"
+    },
+    "guardrails": {
+      "version": "1",
+      "focus": { "is_enabled": true },
+      "prompt_injection": { "is_enabled": true }
+    },
+    "evaluation": {
+      "criteria": [
+        {
+          "id": "answered_from_guides",
+          "name": "answered_from_guides",
+          "type": "prompt",
+          "conversation_goal_prompt": "Every factual answer comes from the knowledge base or the webhook tool result. Mark failure if the agent states a fact that neither source supports."
+        },
+        {
+          "id": "stayed_in_scope",
+          "name": "stayed_in_scope",
+          "type": "prompt",
+          "conversation_goal_prompt": "The agent only discussed the topics its prompt allows and politely declined anything else."
+        },
+        {
+          "id": "replied_in_callers_language",
+          "name": "replied_in_callers_language",
+          "type": "prompt",
+          "conversation_goal_prompt": "Each agent turn is in the language the caller used in the turn before it."
+        },
+        {
+          "id": "no_invented_figures",
+          "name": "no_invented_figures",
+          "type": "prompt",
+          "conversation_goal_prompt": "Every number, fee, date or limit the agent gave appears in the knowledge base or the tool result."
+        },
+        {
+          "id": "offered_next_step",
+          "name": "offered_next_step",
+          "type": "prompt",
+          "conversation_goal_prompt": "The agent ended its answer with a concrete next step, such as an official source to check or a follow-up question."
+        }
+      ]
+    },
+    "data_collection": {
+      "topic": {
+        "type": "string",
+        "description": "The main topic of the call. One of: jobs, salary, visa, schools, money, other."
+      },
+      "language": {
+        "type": "string",
+        "description": "The language the caller mostly used, as an ISO 639-1 code such as en or ar."
+      },
+      "used_salary_tool": {
+        "type": "boolean",
+        "description": "True if the agent called a webhook tool during the call."
+      }
+    }
+  }
+}

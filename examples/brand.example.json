@@ -1,0 +1,64 @@
+{
+  "_comment": "Fictional example brand. Northwind Relocation does not exist; every URL is on example.com.",
+  "agent_name": "Relocation concierge (lab)",
+  "site_name": "Northwind Relocation",
+  "prompt_file": "prompt.example.md",
+  "default_language": "en",
+  "languages": {
+    "en": {
+      "first_message": "Hello. This assistant answers questions about moving to the UAE: visas, schools and banking. What would you like to know?",
+      "voice_id": "VOICE_ID_EN"
+    },
+    "ar": {
+      "first_message": "مرحباً. يجيب هذا المساعد عن أسئلة الانتقال إلى الإمارات، مثل التأشيرات والمدارس والخدمات المصرفية. ماذا تودّ أن تعرف؟",
+      "voice_id": "VOICE_ID_AR"
+    }
+  },
+  "llm": null,
+  "knowledge_base": [
+    { "name": "Visa guide", "url": "https://example.com/guides/visas.md" },
+    { "name": "Schools guide", "url": "https://example.com/guides/schools.md" },
+    { "name": "Banking guide", "url": "https://example.com/guides/banking.md" }
+  ],
+  "webhook_tools": [
+    {
+      "name": "moving_quote",
+      "description": "Estimates the cost of shipping household goods to the UAE. Call it only after the caller has confirmed the origin country, the destination city and the number of bedrooms.",
+      "url": "https://example.com/api/tools/moving-quote",
+      "method": "POST",
+      "secret_env": "VOICE_TOOL_SECRET",
+      "secret_name": "northwind_tool_secret",
+      "timeout_seconds": 10,
+      "body_schema": {
+        "type": "object",
+        "required": ["origin_country", "destination_city", "bedrooms"],
+        "properties": {
+          "origin_country": {
+            "type": "string",
+            "description": "Country the caller is moving from.",
+            "enum": ["uk", "ireland"]
+          },
+          "destination_city": {
+            "type": "string",
+            "description": "UAE city the caller is moving to.",
+            "enum": ["dubai", "abu_dhabi", "sharjah"]
+          },
+          "bedrooms": {
+            "type": "integer",
+            "description": "Number of bedrooms of furniture to ship, from 0 to 6."
+          },
+          "has_car": {
+            "type": "boolean",
+            "description": "True if the caller also wants to ship a car."
+          }
+        }
+      }
+    }
+  ],
+  "limits": {
+    "max_duration_seconds": 300,
+    "daily_limit": 40,
+    "concurrency_limit": 2
+  },
+  "privacy": { "record_voice": false, "retention_days": 30 }
+}

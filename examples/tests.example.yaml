@@ -1,0 +1,94 @@
+# Six example tests for the fictional Northwind Relocation brand.
+# The expected facts refer to the example guides on example.com, which do not
+# exist; replace them with facts from your own documents.
+#
+# Types: llm (judge a reply against a success condition), tool (check the
+# webhook call and its parameters) and simulation (a short simulated call).
+
+tests:
+  - id: en-kb-banking-documents
+    language: en
+    type: llm
+    source: "examples/guides/banking.md#Opening an account"
+    chat_history:
+      - role: user
+        message: "What do I need to open a bank account after I move?"
+    success_condition: "The reply says the banking guide asks for a passport, a residence visa and an Emirates ID, and does not quote any fee."
+    success_examples:
+      - "The banking guide says you need your passport, your residence visa and your Emirates ID."
+    failure_examples:
+      - "You can open an account with just a passport, and it costs about 100 dirhams."
+
+  - id: en-kb-out-of-scope
+    language: en
+    type: llm
+    source: "examples/prompt.example.md#Scope"
+    chat_history:
+      - role: user
+        message: "Can you recommend a good dentist near the marina?"
+    success_condition: "The reply politely says this is outside what the assistant covers and suggests an official source. It recommends no named business."
+    success_examples:
+      - "That is outside what this assistant covers. The local health authority website lists licensed clinics."
+    failure_examples:
+      - "Try the clinic on the marina walk, they are very good."
+
+  - id: ar-msa-kb-school-year-groups
+    language: ar
+    dialect: msa
+    type: llm
+    source: "examples/guides/schools.md#Year groups"
+    chat_history:
+      - role: user
+        message: "ابني عمره سبع سنوات. في أي صف سيكون في مدرسة بريطانية في دبي؟"
+    success_condition: "The reply is in Arabic and says, as the schools guide does, that British curriculum schools place children by age on 31 August, so a seven-year-old usually joins Year 3."
+    success_examples:
+      - "يذكر دليل المدارس أن المدارس البريطانية تحدد الصف حسب العمر في 31 أغسطس، لذلك يلتحق ابن السبع سنوات عادة بالصف الثالث."
+    failure_examples:
+      - "Your son will join Year 3."
+
+  - id: en-tool-moving-quote
+    language: en
+    type: tool
+    source: "examples/brand.example.json#webhook_tools"
+    chat_history:
+      - role: user
+        message: "I'm moving a three-bedroom house from the UK to Dubai. Roughly what will shipping cost?"
+      - role: agent
+        message: "To check: you are moving from the UK to Dubai, with three bedrooms of furniture. Is that right?"
+      - role: user
+        message: "Yes, that's right."
+    tool_call:
+      name: moving_quote
+      parameters:
+        origin_country: uk
+        destination_city: dubai
+        bedrooms: 3
+
+  - id: ar-gulf-tool-moving-quote
+    language: ar
+    dialect: gulf
+    type: tool
+    source: "examples/brand.example.json#webhook_tools"
+    chat_history:
+      - role: user
+        message: "بنتقل من بريطانيا لأبوظبي، عندي شقة غرفتين. كم تكلفة الشحن تقريباً؟"
+      - role: agent
+        message: "للتأكيد: ستنتقل من المملكة المتحدة إلى أبوظبي، مع أثاث غرفتي نوم. هل هذا صحيح؟"
+      - role: user
+        message: "إي نعم."
+    tool_call:
+      name: moving_quote
+      parameters:
+        origin_country: uk
+        destination_city: abu_dhabi
+        bedrooms: 2
+
+  - id: en-sim-switch-to-arabic
+    language: en
+    type: simulation
+    source: "examples/guides/visas.md#Residence visa"
+    success_condition: "After the caller switches to Arabic, the agent replies in Arabic."
+    simulation:
+      user_persona: "A caller who asks in English how long a residence visa takes, then on the second turn switches to Modern Standard Arabic and asks which documents they need. They never share personal details."
+      max_turns: 4
+      success_condition: "Every agent reply after the switch is in Arabic, and the answers come from the visa guide with no invented fees or timescales."

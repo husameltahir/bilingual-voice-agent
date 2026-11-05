@@ -1,0 +1,27 @@
+# Secrets and local state
+.env
+state.local.json
+*.local.*
+
+# Raw evaluation output (may hold full transcripts)
+results/raw/
+
+# Python caches and build output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editors and OS files
+.vscode/
+.idea/
+.DS_Store
