@@ -28,7 +28,7 @@
       }
     },
     "tts": {
-      "model_id": "eleven_flash_v2_5",
+      "model_id": "eleven_flash_v2",
       "voice_id": "{{voice_id}}"
     },
     "asr": {

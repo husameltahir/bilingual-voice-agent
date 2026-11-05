@@ -80,7 +80,7 @@ flowchart LR
 | --- | --- |
 | LLM | `claude-haiku-4-5` (a brand file can override it) |
 | Speech to text | `asr.provider: scribe_realtime` |
-| Text to speech | `tts.model_id: eleven_flash_v2_5` (supports Arabic) |
+| Text to speech | `tts.model_id: eleven_flash_v2` (English must use a v2 model; ElevenLabs moves added languages such as Arabic to the v2.5 multilingual model) |
 | Knowledge base | URL documents, `usage_mode: auto`, RAG on |
 | System tools | `end_call`, `language_detection` |
 | Limits | 300 second calls, 40 calls a day, 2 at once, no bursting |

@@ -39,7 +39,7 @@ def test_agent_language_and_presets(agent) -> None:
     assert agent["name"] == "Relocation concierge (lab)"
     assert cc["agent"]["language"] == "en"
     assert cc["agent"]["first_message"].startswith("Hello.")
-    assert cc["tts"] == {"model_id": "eleven_flash_v2_5", "voice_id": "VOICE_ID_EN"}
+    assert cc["tts"] == {"model_id": "eleven_flash_v2", "voice_id": "VOICE_ID_EN"}
     assert cc["asr"] == {"provider": "scribe_realtime"}
     assert set(cc["language_presets"]) == {"ar"}
     ar = cc["language_presets"]["ar"]["overrides"]
