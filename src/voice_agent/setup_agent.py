@@ -18,6 +18,7 @@ import copy
 import json
 import os
 import sys
+import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -156,6 +157,48 @@ class LiveExecutor:
 
     def note(self, message: str) -> None:
         self.console.print(f"[yellow]note:[/yellow] {message}")
+
+
+DEFAULT_RAG_MODEL = "e5_mistral_7b_instruct"
+RAG_POLL_SECONDS = 5.0
+RAG_POLL_LIMIT = 60
+
+
+def index_knowledge_base(
+    ex: DryRunExecutor | LiveExecutor,
+    doc_ids: list[str],
+    model: str,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+) -> None:
+    """Start a RAG index for each document and wait until every one has succeeded."""
+    pending = list(doc_ids)
+    for attempt in range(RAG_POLL_LIMIT):
+        still: list[str] = []
+        for doc_id in pending:
+            status = ex.call(
+                f"index knowledge base document {doc_id}",
+                "POST",
+                f"/v1/convai/knowledge-base/{doc_id}/rag-index",
+                {"model": model},
+                fake={"status": "succeeded"},
+            ).get("status")
+            if status in (
+                "failed",
+                "rag_limit_exceeded",
+                "document_too_small",
+                "cannot_index_folder",
+            ):
+                raise ElevenLabsError(f"RAG index for document {doc_id}: {status}")
+            if status != "succeeded":
+                still.append(doc_id)
+        if not still:
+            return
+        pending = still
+        if attempt == 0:
+            ex.note(f"waiting for {len(still)} RAG index(es) to finish")
+        sleep(RAG_POLL_SECONDS)
+    raise ElevenLabsError(f"RAG indexes not ready after {RAG_POLL_LIMIT} checks: {pending}")
 
 
 def upsert(
@@ -301,6 +344,15 @@ def run_setup(
         id_field="agent_id",
     )
     persist()
+
+    # 4b. RAG indexes. Attaching a document does not index it, and an agent with
+    # RAG on and no index retrieves nothing, so it declines questions its own
+    # documents answer. POST is idempotent: it starts indexing or reports status.
+    rag = agent_payload["conversation_config"]["agent"]["prompt"].get("rag") or {}
+    if rag.get("enabled") and locators:
+        index_knowledge_base(
+            ex, [loc["id"] for loc in locators], rag.get("embedding_model") or DEFAULT_RAG_MODEL
+        )
 
     # 5. Remove resources this state file created that the brand file no longer lists.
     wanted_tools = {t.name for t in brand.webhook_tools}

@@ -76,7 +76,10 @@ def test_agent_limits_privacy_auth_overrides(agent) -> None:
     assert ps["privacy"] == {"record_voice": False, "retention_days": 30}
     assert ps["auth"] == {"enable_auth": True}
     assert ps["overrides"] == {
-        "conversation_config_override": {"agent": {"language": True, "first_message": True}}
+        "conversation_config_override": {
+            "agent": {"language": True, "first_message": True},
+            "conversation": {"text_only": True},
+        }
     }
     assert ps["guardrails"]["focus"] == {"is_enabled": True}
     assert ps["guardrails"]["prompt_injection"] == {"is_enabled": True}

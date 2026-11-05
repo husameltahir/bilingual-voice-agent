@@ -2,7 +2,7 @@
 
 Configure an English and Arabic ElevenLabs voice agent from a JSON file, and check it with a repeatable test suite.
 
-Status: code and mocked tests complete. The live evaluation has not run yet (see [Results](#results)).
+Status: running live against a UK-to-UAE relocation platform's guides and salary API. 25 of 28 tests pass (see [Results](#results)).
 
 ## The problem
 
@@ -118,7 +118,16 @@ All calls go to `https://api.elevenlabs.io` with the `xi-api-key` header. The cl
 
 ## Results
 
-The live evaluation runs on a desktop machine with a real API key, because the development environment for this repository cannot reach `api.elevenlabs.io`. `results/latest.md` is written by that run. **There has been no live run yet**, so the table there is empty.
+First live run, 5 to 6 November 2026, against a bilingual agent for a UK-to-UAE relocation platform: 31 guides in the knowledge base and one webhook tool for a salary comparison. 28 tests: 14 English, 14 Arabic (Modern Standard and Gulf phrasing).
+
+| Run | What changed | Passed |
+| --- | --- | ---: |
+| 1 | First run | 5 of 28 |
+| 2 | RAG indexes built for every document | 22 of 28 |
+| 3 | `body.` prefix on tool parameter paths; one test fixed | 25 of 28 |
+| 4 | One prompt rule; one test fixed | 25 of 28 |
+
+The last two runs failed different tests, apart from one: a prompt-injection test the platform's guardrail blocks before the agent replies, which the Tests API scores as a failure. Full table: [`results/latest.md`](results/latest.md).
 
 ## Demo
 
@@ -169,22 +178,18 @@ See `examples/tests.example.yaml`. Each case has an `id` that starts with its la
 
 ## What I learned
 
-<!-- CONFIRM: written after the live run -->
-- (to be written after the live run)
-
-<!-- CONFIRM: written after the live run -->
-- (to be written after the live run)
-
-<!-- CONFIRM: written after the live run -->
-- (to be written after the live run)
+- **Attaching a document is not indexing it.** With RAG on and no index built, the agent retrieved nothing and declined questions its own guides answer: 5 of 28 tests passed. Building the indexes took it to 22. `setup_agent` now requests an index for every document and waits until each one reports `succeeded`.
+- **The platform's rules show up only against the live API.** English agents must use Flash v2, not v2.5 (other languages move to the v2.5 multilingual model on their own). A library voice with live moderation cannot be used by an agent. Every client override has to be allowed in the agent config, or the WebSocket closes with code 1008 before the first message, which the web client shows as nothing at all.
+- **A failing test is often the test.** Of the failures after indexing, three were in the tests: a scripted turn that never said how many adults were moving (the agent rightly asked), parameter paths that needed a `body.` prefix for a webhook tool, and an evaluator that cannot see the documents and so flagged a fee the guide does quote. Reading the transcript before changing the prompt saved three wrong prompt edits.
 
 ## Limitations
 
 - **Gulf dialect accuracy is undocumented.** ElevenLabs rates Scribe's Arabic speech recognition in its "Good" band (word error rate above 10% and up to 20%) with no dialect breakdown. The test set includes Gulf-dialect phrasing so the gap shows up in results rather than being assumed away.
-- **Per-language voice.** The SDK types allow `tts.voice_id` inside a language preset's overrides, which this project uses. The public docs do not describe it. If the API ignores it, set the Arabic voice in the dashboard (agent, Voice, per language) and note it here.
+- **Per-language voice.** `tts.voice_id` inside a language preset's overrides is not in the public docs, but the live API accepts it and returns it when the agent is read back.
 - **Language switching mid-call.** ElevenLabs' own pages disagree on whether the language can change after a call starts. The agent has the `language_detection` tool, and the web page also sets the language up front.
 - **Tests run against the default language.** All tests run in one invocation against the agent as configured, so Arabic cases test a caller who speaks Arabic to an agent whose default language is English. That matches a caller who switches, not one who picked Arabic on the page first.
-- **Tool parameter paths.** Tool tests use the bare property name (for example `bedrooms`) as the parameter path. The SDK does not document the path format; `evals sync --param-path-prefix` changes it if the live API expects a prefix.
+- **Tool parameter paths.** For a webhook tool the live API expects the request-body prefix: run `evals sync --param-path-prefix body.`. Without it every parameter fails with "Parameter path not found".
+- **Guardrail blocks count as failures.** A reply the prompt-injection guardrail blocks is scored as a failed test, even though nothing leaked.
 - **Knowledge base documents are not refreshed.** A URL already in the state file is reused as is. Delete its entry from the state file (or run `--teardown`) to fetch it again.
 - **Docs links.** The endpoint paths above come from the SDK source. Some docs page links follow ElevenLabs' URL pattern and were not opened from the development environment.
 

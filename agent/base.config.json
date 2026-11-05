@@ -53,6 +53,9 @@
         "agent": {
           "language": true,
           "first_message": true
+        },
+        "conversation": {
+          "text_only": true
         }
       }
     },

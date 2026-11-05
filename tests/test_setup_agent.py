@@ -13,6 +13,7 @@ from voice_agent.setup_agent import main
 from .conftest import TOOL_SECRET
 
 ENV = {"VOICE_TOOL_SECRET": TOOL_SECRET}
+KB_NAMES = ["Visa guide", "Schools guide", "Banking guide"]
 
 
 def _dry_run(brand: Path, state: Path, env=ENV) -> tuple[int, dict]:
@@ -32,6 +33,9 @@ def _mock_create_routes(m: respx.MockRouter) -> dict[str, respx.Route]:
             side_effect=lambda _req: httpx.Response(200, json={"id": next(kb_ids), "name": "x"})
         ),
         "agent": m.post("/v1/convai/agents/create").respond(200, json={"agent_id": "agent_1"}),
+        "rag": m.post(path__regex=r"^/v1/convai/knowledge-base/[^/]+/rag-index$").respond(
+            200, json={"status": "succeeded"}
+        ),
     }
 
 
@@ -48,7 +52,9 @@ def test_dry_run_prints_payloads_and_masks_secret(brand_dir: Path) -> None:
         "/v1/convai/knowledge-base/url",
         "/v1/convai/knowledge-base/url",
         "/v1/convai/agents/create",
+        *[f"/v1/convai/knowledge-base/<new document id: {n}>/rag-index" for n in KB_NAMES],
     ]
+    assert steps[-1]["body"] == {"model": "e5_mistral_7b_instruct"}
     assert steps[0]["body"] == {
         "type": "new",
         "name": "northwind_tool_secret",
@@ -56,7 +62,7 @@ def test_dry_run_prints_payloads_and_masks_secret(brand_dir: Path) -> None:
     }
     headers = steps[1]["body"]["tool_config"]["api_schema"]["request_headers"]
     assert headers == {"Authorization": {"secret_id": "<new secret id: northwind_tool_secret>"}}
-    agent = steps[-1]["body"]
+    agent = steps[5]["body"]
     assert agent["conversation_config"]["agent"]["prompt"]["tool_ids"] == [
         "<new tool id: moving_quote>"
     ]
@@ -127,7 +133,9 @@ def test_apply_creates_then_updates(respx_mock, brand_dir: Path, client_factory)
     }
     assert main(args, env=ENV, client_factory=client_factory) == 0
     for route in created.values():
-        assert route.call_count == (3 if route is created["kb"] else 1)
+        # Documents are created once; indexing is requested on every apply (3 docs x 2 runs).
+        expected = {id(created["kb"]): 3, id(created["rag"]): 6}.get(id(route), 1)
+        assert route.call_count == expected
     for route in updates.values():
         assert route.call_count == 1
     assert json.loads(updates["secret"].calls.last.request.content)["type"] == "update"
@@ -151,6 +159,9 @@ def test_apply_recreates_agent_deleted_elsewhere(respx_mock, brand_dir, client_f
     respx_mock.patch("/v1/convai/secrets/sec_1").respond(200, json={"secret_id": "sec_1"})
     respx_mock.patch("/v1/convai/tools/tool_1").respond(200, json={"id": "tool_1"})
     respx_mock.post("/v1/convai/knowledge-base/url").respond(200, json={"id": "doc_x"})
+    respx_mock.post("/v1/convai/knowledge-base/doc_x/rag-index").respond(
+        200, json={"status": "succeeded"}
+    )
     respx_mock.patch("/v1/convai/agents/gone").respond(404, json={"detail": "not found"})
     create = respx_mock.post("/v1/convai/agents/create").respond(200, json={"agent_id": "new"})
     args = ["--brand", str(brand_dir / "brand.json"), "--state", str(state_path), "--apply"]
@@ -205,3 +216,42 @@ def test_teardown_deletes_everything_in_state(respx_mock, tmp_path, client_facto
 
 def test_teardown_with_empty_state(tmp_path, client_factory) -> None:
     assert main(["--teardown", "--state", str(tmp_path / "none.json")], env={}) == 0
+
+
+class _ScriptedExecutor:
+    """Returns queued RAG statuses per document, as ElevenLabs reports them."""
+
+    live = True
+
+    def __init__(self, statuses: dict[str, list[str]]):
+        self.statuses = statuses
+        self.notes: list[str] = []
+
+    def call(self, step, method, path, body=None, fake=None):
+        doc_id = path.split("/")[-2]
+        return {"status": self.statuses[doc_id].pop(0)}
+
+    def note(self, message: str) -> None:
+        self.notes.append(message)
+
+
+def test_index_knowledge_base_waits_until_every_index_succeeds() -> None:
+    from voice_agent.setup_agent import index_knowledge_base
+
+    ex = _ScriptedExecutor({"a": ["created", "processing", "succeeded"], "b": ["succeeded"]})
+    sleeps: list[float] = []
+    index_knowledge_base(ex, ["a", "b"], "e5_mistral_7b_instruct", sleep=sleeps.append)
+    assert len(sleeps) == 2
+    assert ex.statuses == {"a": [], "b": []}
+    assert ex.notes == ["waiting for 1 RAG index(es) to finish"]
+
+
+def test_index_knowledge_base_stops_on_a_failed_index() -> None:
+    import pytest
+
+    from voice_agent.client import ElevenLabsError
+    from voice_agent.setup_agent import index_knowledge_base
+
+    ex = _ScriptedExecutor({"a": ["failed"]})
+    with pytest.raises(ElevenLabsError, match="RAG index for document a: failed"):
+        index_knowledge_base(ex, ["a"], "e5_mistral_7b_instruct", sleep=lambda _s: None)
